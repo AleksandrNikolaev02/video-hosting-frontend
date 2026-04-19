@@ -19,7 +19,7 @@ export default function Home() {
 
       <div className="grid grid-cols-4 gap-4">
         {videos.map((v) => (
-          <Link to={`/video?filename=${v.filename}&user_id=${v.userId}`} key={v.filename}>
+          <Link to={`/video?filename=${v.filename}`} key={v.filename}>
             <div className="border rounded-xl p-2 hover:shadow-lg">
               <img
                 src={v.video_preview}

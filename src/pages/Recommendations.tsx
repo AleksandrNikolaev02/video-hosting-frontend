@@ -16,7 +16,7 @@ export default function Recommendations() {
       {videos.map((v) => (
         <Link
           key={v.filename}
-          to={`/video?filename=${v.filename}&user_id=${v.userId}`}
+          to={`/video?filename=${v.filename}`}
           className="flex gap-3 hover:bg-gray-800 p-2 rounded-lg transition"
         >
           {/* превью */}

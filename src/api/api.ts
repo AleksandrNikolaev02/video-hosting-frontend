@@ -177,3 +177,41 @@ export const deleteVideo = async (filename: string) => {
     }
   });
 };
+
+// получить информацию о канале
+export const getChannel = async (id: number) => {
+  const res = await api.get(`business-service/channel/channel/${id}`);
+  return res.data;
+};
+
+// получить видео с канала пользователя
+export const getChannelVideos = async (id: number) => {
+  const res = await api.get(`business-service/video/get_videos_by_channel/${id}`);
+  return res.data;
+};
+
+// получить информацию о видео
+export const getVideoInfo = async (filename: string) => {
+  const res = await api.get(`business-service/video/get_video/${filename}`);
+  return res.data;
+};
+
+// подписаться на канал
+export const subscribe = async (channelId: number) => {
+  await api.post('business-service/subscription/subscribe', {
+    channelId
+  });
+};
+
+// отписаться от канала
+export const unsubscribe = async (channelId: number) => {
+  await api.post('business-service/subscription/unsubscribe', {
+    channelId
+  });
+};
+
+// получить список каналов, на которые подписан пользователь
+export const getMySubscriptions = async () => {
+  const res = await api.get('business-service/subscription/list-channels');
+  return res.data;
+};

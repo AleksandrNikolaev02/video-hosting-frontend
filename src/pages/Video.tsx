@@ -1,22 +1,45 @@
-import { useSearchParams } from 'react-router-dom';
-import { getBaseUrl, reactVideo, getReactions, deleteComment,
-  checkEvaluate, getComments, addComment, reactComment, editComment, getSubComments } from '../api/api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getBaseUrl, reactVideo, getReactions, deleteComment, getVideoInfo,
+  checkEvaluate, getComments, addComment, reactComment, editComment, getSubComments, 
+  getMySubscriptions,
+  unsubscribe,
+  subscribe} from '../api/api';
 import { useState, useEffect } from 'react';
 import type { Comment } from '../model/Comment';
+import type { Video } from '../model/Video';
 import CommentItem from './CommentItem';
 import Recommendations from './Recommendations';
 
 export default function Video() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
 
   const [likes, setLikes] = useState(0);
   const [dislikes, setDislikes] = useState(0);
   const [reaction, setReaction] = useState<'LIKE' | 'DISLIKE' | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
+  const [video, setVideo] = useState<Video | null>(null);
+  const [subscribed, setSubscribed] = useState(false);
+  const [subscribersCount, setSubscribersCount] = useState(0);
 
   const filename = params.get('filename');
-  const user_id = params.get('user_id');
+
+  const loadVideo = async () => {
+    const data = await getVideoInfo(filename!);
+    setVideo(data);
+    setSubscribersCount(data.subscribersCount);
+  };
+
+  useEffect(() => {
+    getMySubscriptions().then((subs) => {
+      setSubscribed(subs.some((c: any) => c.id === video?.channelId));
+    });
+  }, [video?.channelId]);
+
+  useEffect(() => {
+    loadVideo();
+  }, [filename]);
 
   useEffect(() => {
     if (!filename) return;
@@ -49,7 +72,24 @@ export default function Video() {
     });
   }, [filename]);
 
-  const videoUrl = `${getBaseUrl()}/file-service/file_chunk?filename=${filename}&user_id=${user_id}`;
+  const videoUrl = `${getBaseUrl()}/file-service/file_chunk?filename=${filename}&user_id=${video?.userId}`;
+
+  const handleSubscribe = async () => {
+    if (!video?.channelId) return;
+
+    if (subscribed) {
+      await unsubscribe(video?.channelId);
+    } else {
+      await subscribe(video?.channelId);
+    }
+
+    // 🔥 ВОТ КЛЮЧ
+    await loadVideo();
+
+    // и обнови состояние подписки
+    const subs = await getMySubscriptions();
+    setSubscribed(subs.some((c: any) => c.id === video?.channelId));
+  };
 
   const handleLike = async () => {
     if (!filename) return;
@@ -242,6 +282,45 @@ export default function Video() {
         <video controls className="w-full max-w-[900px]" preload='metadata' src={videoUrl} />
 
         <div className="mt-4 flex gap-4">
+            <div className="flex items-center justify-between mt-6">
+
+  {/* 👈 ЛЕВАЯ ЧАСТЬ */}
+  <div className="flex items-center gap-3">
+
+    {/* аватар */}
+    <div className="w-12 h-12 rounded-full bg-gray-400 flex items-center justify-center text-white text-lg">
+      {video?.channelName.charAt(0)}
+    </div>
+
+    {/* инфа */}
+    <div>
+      <div
+        onClick={() => navigate(`/channel/${video?.channelId}`)}
+        className="font-semibold cursor-pointer hover:underline"
+      >
+        {video?.channelName}
+      </div>
+
+      <div className="text-sm text-gray-500">
+        {video?.subscribersCount} подписчиков
+      </div>
+    </div>
+  </div>
+
+    {/* 👉 КНОПКА */}
+    <button
+      onClick={handleSubscribe}
+      className={`px-4 py-2 rounded-full font-semibold ${
+        subscribed
+          ? 'bg-gray-300 text-black'
+          : 'bg-white text-black'
+      }`}
+    >
+      {subscribed ? 'Вы подписаны' : 'Подписаться'}
+    </button>
+
+  </div>
+
             <button
               onClick={handleLike}
               className={`px-4 py-2 rounded ${

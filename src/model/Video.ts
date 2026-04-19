@@ -9,4 +9,7 @@ export type Video = {
   countViewing: number;
   video_preview: string;
   tags: string[];
+  channelId: number;
+  subscribersCount: number;
+  channelName: string;
 };

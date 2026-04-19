@@ -6,6 +6,8 @@ import CreateChannel from './pages/CreateChannel';
 import SearchPage from './pages/SearchPage';
 import Header from './pages/Header';
 import MyChannel from './pages/MyChannel';
+import ChannelPage from './pages/Channel';
+import Subscriptions from './pages/Subscriptions';
 
 function App() {
   return (
@@ -18,6 +20,8 @@ function App() {
         <Route path="/create-channel" element={<CreateChannel />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/my-channel" element={<MyChannel />} />
+        <Route path="/channel/:id" element={<ChannelPage />} />
+        <Route path="/subscriptions" element={<Subscriptions />} />
       </Routes>
     </BrowserRouter>
   )

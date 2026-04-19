@@ -47,6 +47,10 @@ export default function Header() {
 
       <div className="flex gap-4">
 
+        <button onClick={() => navigate('/subscriptions')}>
+          Подписки
+        </button>
+
         {hasChannelState && (
             <Link to="/my-channel" className="bg-gray-600 px-3 py-1 rounded">
             My channel
