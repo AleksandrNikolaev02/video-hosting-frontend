@@ -1,9 +1,7 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getBaseUrl, reactVideo, getReactions, deleteComment, getVideoInfo,
   checkEvaluate, getComments, addComment, reactComment, editComment, getSubComments, 
-  getMySubscriptions,
-  unsubscribe,
-  subscribe} from '../api/api';
+  getMySubscriptions, addViewing, unsubscribe, subscribe} from '../api/api';
 import { useState, useEffect } from 'react';
 import type { Comment } from '../model/Comment';
 import type { Video } from '../model/Video';
@@ -22,6 +20,7 @@ export default function Video() {
   const [video, setVideo] = useState<Video | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
+  const [viewSent, setViewSent] = useState(false);
 
   const filename = params.get('filename');
 
@@ -29,6 +28,15 @@ export default function Video() {
     const data = await getVideoInfo(filename!);
     setVideo(data);
     setSubscribersCount(data.subscribersCount);
+  };
+
+  const formatViews = (num?: number) => {
+    if (!num) return 0;
+
+    if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
+    if (num >= 1_000) return (num / 1_000).toFixed(1) + 'K';
+
+    return num;
   };
 
   useEffect(() => {
@@ -89,6 +97,13 @@ export default function Video() {
     // и обнови состояние подписки
     const subs = await getMySubscriptions();
     setSubscribed(subs.some((c: any) => c.id === video?.channelId));
+  };
+
+  const handleTimeUpdate = (e: any) => {
+    if (!viewSent && e.target.currentTime > 5) {
+      addViewing(filename!);
+      setViewSent(true);
+    }
   };
 
   const handleLike = async () => {
@@ -279,7 +294,7 @@ export default function Video() {
       {/* 🎬 ЛЕВАЯ ЧАСТЬ */}
       <div className="flex-1 min-w-0">
 
-        <video controls className="w-full max-w-[900px]" preload='metadata' src={videoUrl} />
+        <video controls className="w-full max-w-[900px]" preload='metadata' src={videoUrl} onTimeUpdate={handleTimeUpdate}/>
 
         <div className="mt-4 flex gap-4">
             <div className="flex items-center justify-between mt-6">
@@ -303,6 +318,10 @@ export default function Video() {
 
       <div className="text-sm text-gray-500">
         {video?.subscribersCount} подписчиков
+      </div>
+
+      <div className="mt-2 text-gray-400 text-sm">
+        👁 {formatViews(video?.countViewing)} просмотров
       </div>
     </div>
   </div>

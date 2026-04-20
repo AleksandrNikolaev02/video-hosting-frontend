@@ -215,3 +215,8 @@ export const getMySubscriptions = async () => {
   const res = await api.get('business-service/subscription/list-channels');
   return res.data;
 };
+
+// добавить просмотр к видео
+export const addViewing = async (filename: string) => {
+  await api.post(`business-service/viewing/add/${filename}`);
+};
