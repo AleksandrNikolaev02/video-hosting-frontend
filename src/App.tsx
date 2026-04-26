@@ -8,6 +8,7 @@ import Header from './pages/Header';
 import MyChannel from './pages/MyChannel';
 import ChannelPage from './pages/Channel';
 import Subscriptions from './pages/Subscriptions';
+import EditVideo from './pages/EditVideo';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/my-channel" element={<MyChannel />} />
         <Route path="/channel/:id" element={<ChannelPage />} />
         <Route path="/subscriptions" element={<Subscriptions />} />
+        <Route path="/edit-video" element={<EditVideo />} />
       </Routes>
     </BrowserRouter>
   )

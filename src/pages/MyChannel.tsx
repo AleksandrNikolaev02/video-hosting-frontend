@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getMyVideos, deleteVideo, postVideo } from '../api/api';
+import { getMyVideos, deleteVideo, postVideo, getPreviewUrl } from '../api/api';
 import { useNavigate } from 'react-router-dom';
 import type { Video } from '../model/Video';
 
@@ -35,7 +35,7 @@ export default function MyChannel() {
           <div key={v.filename} className="border p-3 rounded">
 
             <img
-              src={v.video_preview}
+              src={v.video_preview != null ? getPreviewUrl(v.video_preview.previewId) : ""}
               className="w-full h-40 object-cover rounded"
             />
 
@@ -66,6 +66,13 @@ export default function MyChannel() {
                   🚀 Опубликовать
                 </button>
               )}
+
+              <button
+                onClick={() => navigate(`/edit-video?filename=${v.filename}`)}
+                className="text-blue-500"
+              >
+                ✏️ Редактировать
+              </button>
 
               <button
                 onClick={() => handleDelete(v.filename)}

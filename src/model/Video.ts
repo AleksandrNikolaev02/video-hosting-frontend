@@ -1,3 +1,8 @@
+type Preview = {
+  path: string
+  previewId: string
+};
+
 export type Video = {
   filename: string;
   userId: number;
@@ -7,7 +12,7 @@ export type Video = {
   videoStatus: string;
   date: Date;
   countViewing: number;
-  video_preview: string;
+  video_preview: Preview;
   tags: string[];
   channelId: number;
   subscribersCount: number;

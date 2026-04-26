@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { hasChannel, createVideo, postVideo, 
-  saveAllChunks, uploadChunk } from '../api/api';
+  saveAllChunks, uploadChunk, 
+  uploadPreview,
+  createPreview} from '../api/api';
 import { useNavigate } from 'react-router-dom';
 import splitFile from '../util/chunk';
 import generateKey from '../util/generator';
@@ -12,8 +14,9 @@ export default function UploadVideo() {
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
-  const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
 
   const navigate = useNavigate();
 
@@ -72,47 +75,50 @@ export default function UploadVideo() {
 
       await uploadChunk(formData);
 
+      // 🔥 прогресс
       setProgress(Math.round(((i + 1) / chunks.length) * 100));
 
       console.log(`Uploaded chunk ${i + 1}/${chunks.length}`);
     }
 
-    // 🔥 собрать файл
-    await saveAllChunks(key, filename, 1); // TODO: user_id нужно брать из контекста авторизации, пока просто 1
-
-    // 🔥 опубликовать
-    await postVideo(filename);
+    await saveAllChunks(key, filename, 1);
   };
 
   // 🔥 Отправка
   const handleUpload = async () => {
-    if (!file) {
-      alert('Выбери файл');
-      return;
-    }
-
-    setLoading(true);
+    if (!file) return;
 
     try {
-      // 1. создать видео
-      const res = await createVideo({
+      setIsUploading(true);
+      setProgress(0);
+
+      // 1️⃣ создаём видео
+      const videoRes = await createVideo({
         title,
-        description,
+        description
       });
 
-      const filename = res.filename;
+      const filename = videoRes.filename;
 
-      // 2. загрузить файл чанками
+      // 2️⃣ загружаем видео
       await uploadFile(file, filename);
 
-      alert('Видео загружено 🎉');
+      // 3️⃣ превью
+      if (previewFile) {
+        const previewRes = await createPreview(filename);
+        await uploadPreview(previewFile, previewRes.filename, previewFile.name);
+      }
 
-      navigate(`/video/${filename}`);
+      // 4️⃣ публикация
+      await postVideo(filename);
+
+      // ✅ РЕДИРЕКТ
+      navigate(`/video?filename=${filename}`);
+
     } catch (e) {
       console.error(e);
-      alert('Ошибка загрузки');
     } finally {
-      setLoading(false);
+      setIsUploading(false);
     }
   };
 
@@ -146,16 +152,33 @@ export default function UploadVideo() {
         className="mb-4"
       />
 
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          if (e.target.files?.[0]) {
+            setPreviewFile(e.target.files[0]);
+          }
+        }}
+      />
+
+      {previewFile && (
+        <img
+          src={URL.createObjectURL(previewFile)}
+          className="w-64 mt-2 rounded"
+        />
+      )}
+
       {/* кнопка */}
       <button
         onClick={handleUpload}
-        disabled={loading}
+        disabled={isUploading}
         className="bg-blue-500 text-white px-4 py-2 rounded"
       >
-        {loading ? 'Загрузка...' : 'Загрузить'}
+        {isUploading ? 'Загрузка...' : 'Загрузить'}
       </button>
 
-      {loading && (
+      {isUploading && (
           <div className="mt-4">
             <div className="w-full bg-gray-300 h-4 rounded">
               <div

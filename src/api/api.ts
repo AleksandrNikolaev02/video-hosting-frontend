@@ -220,3 +220,85 @@ export const getMySubscriptions = async () => {
 export const addViewing = async (filename: string) => {
   await api.post(`business-service/viewing/add/${filename}`);
 };
+
+// создать бизнес сущность превью
+export const createPreview = async (videoId: string) => {
+  const res = await api.post('business-service/preview/create', {
+    videoId
+  });
+  return res.data;
+};
+
+// загрузить превью в Minio
+export const uploadPreview = async (file: File, filename: string, originalFilename: string) => {
+  const formData = new FormData();
+
+  formData.append('file', file);
+
+  formData.append(
+    'dto',
+    new Blob(
+      [JSON.stringify({ filename, originalFilename })],
+      { type: 'application/json' }
+    )
+  );
+
+  const res = await api.post(
+    'file-service/save_preview',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
+  );
+
+  return res.data;
+};
+
+// получить url превью
+export const getPreviewUrl = (filename: string | undefined) => {
+  return `${url}/file-service/get_preview/${filename}`;
+};
+
+// редактировать видео
+export const updateVideo = async (filename: string, data: {
+  title: string;
+  description: string;
+}) => {
+  await api.put(`business-service/video/update/${filename}`, data);
+};
+
+// обновить превью видео
+export const updatePreview = async (file: File, filename: string, originalFilename: string) => {
+  const formData = new FormData();
+
+  formData.append(
+    'dto',
+    new Blob([JSON.stringify({ filename, originalFilename })], {
+      type: 'application/json'
+    })
+  );
+
+  formData.append('file', file);
+
+  await api.put('file-service/update_preview', formData);
+};
+
+// добавить коллекцию тегов
+export const addTags = async (filename: string, names: string[]) => {
+  await api.post('business-service/tag/add', {
+    filename,
+    names
+  });
+};
+
+// удалить коллекцию тегов
+export const deleteTags = async (filename: string, names: string[]) => {
+  await api.delete('business-service/tag/delete', {
+    data: { 
+      filename: filename,
+      names: names
+    }
+  });
+};

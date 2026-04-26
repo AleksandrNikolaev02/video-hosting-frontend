@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getBaseUrl, reactVideo, getReactions, deleteComment, getVideoInfo,
   checkEvaluate, getComments, addComment, reactComment, editComment, getSubComments, 
-  getMySubscriptions, addViewing, unsubscribe, subscribe} from '../api/api';
+  getMySubscriptions, addViewing, unsubscribe, subscribe, getPreviewUrl} from '../api/api';
 import { useState, useEffect } from 'react';
 import type { Comment } from '../model/Comment';
 import type { Video } from '../model/Video';
@@ -294,7 +294,7 @@ export default function Video() {
       {/* 🎬 ЛЕВАЯ ЧАСТЬ */}
       <div className="flex-1 min-w-0">
 
-        <video controls className="w-full max-w-[900px]" preload='metadata' src={videoUrl} onTimeUpdate={handleTimeUpdate}/>
+        <video poster={video?.video_preview != null ? getPreviewUrl(video?.video_preview.previewId) : ""} controls className="w-full max-w-[900px]" preload='metadata' src={videoUrl} onTimeUpdate={handleTimeUpdate}/>
 
         <div className="mt-4 flex gap-4">
             <div className="flex items-center justify-between mt-6">
