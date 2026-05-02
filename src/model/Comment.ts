@@ -15,6 +15,7 @@ export type Comment = {
   content: string;
   creatorId: number;
   belong: boolean;
+  authorName: string;
   like: Like;
   dislike: Dislike;
 

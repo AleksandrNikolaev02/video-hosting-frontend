@@ -159,9 +159,10 @@ export const hasChannel = async (): Promise<boolean> => {
 };
 
 // создать канал пользователя
-export const createChannel = async (name: string) => {
+export const createChannel = async (name: string, description: string) => {
   await api.post('auth/business-service/channel/create', {
-    name
+    name: name,
+    description: description
   });
 };
 
@@ -213,6 +214,11 @@ export const deleteVideo = async (filename: string) => {
 // получить информацию о канале
 export const getChannel = async (id: number) => {
   const res = await api.get(`noauth/business-service/channel/channel/${id}`);
+  return res.data;
+};
+
+export const getMyChannelInfo = async () => {
+  const res = await api.get('auth/business-service/channel/my-channel');
   return res.data;
 };
 

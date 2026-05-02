@@ -1,16 +1,19 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getBaseUrl, reactVideo, getReactions, deleteComment, getVideoInfo,
-  checkEvaluate, getComments, addComment, reactComment, editComment, getSubComments, 
-  getMySubscriptions, addViewing, unsubscribe, subscribe, getPreviewUrl} from '../api/api';
+import {
+  getBaseUrl, reactVideo, getReactions, deleteComment, getVideoInfo,
+  checkEvaluate, getComments, addComment, reactComment, editComment,
+  getSubComments, getMySubscriptions, addViewing, unsubscribe, subscribe, getPreviewUrl
+} from '../api/api';
 import { useState, useEffect } from 'react';
 import type { Comment } from '../model/Comment';
 import type { Video } from '../model/Video';
 import CommentItem from './CommentItem';
 import Recommendations from './Recommendations';
 
-export default function Video() {
+export default function VideoPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const filename = params.get('filename');
 
   const [likes, setLikes] = useState(0);
   const [dislikes, setDislikes] = useState(0);
@@ -19,82 +22,46 @@ export default function Video() {
   const [commentText, setCommentText] = useState('');
   const [video, setVideo] = useState<Video | null>(null);
   const [subscribed, setSubscribed] = useState(false);
-  const [subscribersCount, setSubscribersCount] = useState(0);
   const [viewSent, setViewSent] = useState(false);
-
-  const filename = params.get('filename');
 
   const loadVideo = async () => {
     const data = await getVideoInfo(filename!);
     setVideo(data);
-    setSubscribersCount(data.subscribersCount);
   };
 
-  const formatViews = (num?: number) => {
-    if (!num) return 0;
-
-    if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
-    if (num >= 1_000) return (num / 1_000).toFixed(1) + 'K';
-
-    return num;
+  const formatViews = (n?: number) => {
+    if (!n) return '0';
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+    return String(n);
   };
+
+  useEffect(() => { loadVideo(); }, [filename]);
 
   useEffect(() => {
-    getMySubscriptions().then((subs) => {
-      setSubscribed(subs.some((c: any) => c.id === video?.channelId));
-    });
+    getMySubscriptions().then(subs =>
+      setSubscribed(subs.some((c: any) => c.id === video?.channelId))
+    );
   }, [video?.channelId]);
 
   useEffect(() => {
-    loadVideo();
-  }, [filename]);
-
-  useEffect(() => {
     if (!filename) return;
-
-    getReactions(filename).then((data) => {
-      setLikes(data.likes);
-      setDislikes(data.dislikes);
+    getReactions(filename).then(d => { setLikes(d.likes); setDislikes(d.dislikes); });
+    checkEvaluate(filename).then(d => {
+      if (d.likeBelong) setReaction('LIKE');
+      else if (d.dislikeBelong) setReaction('DISLIKE');
+      else setReaction(null);
     });
-  }, [filename]);
-
-  useEffect(() => {
-    if (!filename) return;
-
-    checkEvaluate(filename).then((data) => {
-      if (data.likeBelong) {
-        setReaction('LIKE');
-      } else if (data.dislikeBelong) {
-        setReaction('DISLIKE');
-      } else {
-        setReaction(null);
-      }
-    });
-  }, [filename]);
-
-  useEffect(() => {
-    if (!filename) return;
-
-    getComments(filename, 0, 10).then((data) => {
-      setComments(data);
-    });
+    getComments(filename, 0, 10).then(setComments);
   }, [filename]);
 
   const videoUrl = `${getBaseUrl()}/noauth/file-service/file_chunk?filename=${filename}&user_id=${video?.userId}`;
 
   const handleSubscribe = async () => {
     if (!video?.channelId) return;
-
-    if (subscribed) {
-      await unsubscribe(video?.channelId);
-    } else {
-      await subscribe(video?.channelId);
-    }
-
-    // 🔥 ВОТ КЛЮЧ
+    if (subscribed) await unsubscribe(video.channelId);
+    else await subscribe(video.channelId);
     await loadVideo();
-
-    // и обнови состояние подписки
     const subs = await getMySubscriptions();
     setSubscribed(subs.some((c: any) => c.id === video?.channelId));
   };
@@ -108,301 +75,337 @@ export default function Video() {
 
   const handleLike = async () => {
     if (!filename) return;
-
     await reactVideo(filename, 'LIKE');
-
     setReaction(prev => {
-      if (prev === 'LIKE') {
-        setLikes(likes - 1);
-        return null;
-      }
-
-      if (prev === 'DISLIKE') {
-        setDislikes(dislikes - 1);
-        setLikes(likes + 1);
-        return 'LIKE';
-      }
-
-      setLikes(likes + 1);
-      return 'LIKE';
+      if (prev === 'LIKE') { setLikes(l => l - 1); return null; }
+      if (prev === 'DISLIKE') { setDislikes(d => d - 1); setLikes(l => l + 1); return 'LIKE'; }
+      setLikes(l => l + 1); return 'LIKE';
     });
   };
 
   const handleDislike = async () => {
     if (!filename) return;
-
     await reactVideo(filename, 'DISLIKE');
-
     setReaction(prev => {
-      if (prev === 'DISLIKE') {
-        setDislikes(dislikes - 1);
-        return null;
-      }
-
-      if (prev === 'LIKE') {
-        setLikes(likes - 1);
-        setDislikes(dislikes + 1);
-        return 'DISLIKE';
-      }
-
-      setDislikes(dislikes + 1);
-      return 'DISLIKE';
+      if (prev === 'DISLIKE') { setDislikes(d => d - 1); return null; }
+      if (prev === 'LIKE') { setLikes(l => l - 1); setDislikes(d => d + 1); return 'DISLIKE'; }
+      setDislikes(d => d + 1); return 'DISLIKE';
     });
   };
 
   const handleAddComment = async () => {
-    console.log('New text: ' + commentText);
-
     if (!filename || !commentText.trim()) return;
-
     await addComment(commentText, filename);
-
     const data = await getComments(filename, 0, 10);
     setComments(data);
-
     setCommentText('');
   };
 
   const handleCommentLike = async (commentId: number) => {
     await reactComment(commentId, 'LIKE');
-
-    setComments(prev =>
-      updateCommentTree(prev, commentId, (c) => {
-        if (c.like.belong) {
-          return {
-            ...c,
-            like: { count: c.like.count - 1, belong: false }
-          };
-        }
-
-        if (c.dislike.belong) {
-          return {
-            ...c,
-            like: { count: c.like.count + 1, belong: true },
-            dislike: { count: c.dislike.count - 1, belong: false }
-          };
-        }
-
-        return {
-          ...c,
-          like: { count: c.like.count + 1, belong: true }
-        };
-      })
-    );
+    setComments(prev => updateTree(prev, commentId, c => {
+      if (c.like.belong) return { ...c, like: { count: c.like.count - 1, belong: false } };
+      if (c.dislike.belong) return { ...c, like: { count: c.like.count + 1, belong: true }, dislike: { count: c.dislike.count - 1, belong: false } };
+      return { ...c, like: { count: c.like.count + 1, belong: true } };
+    }));
   };
 
   const handleCommentDislike = async (commentId: number) => {
     await reactComment(commentId, 'DISLIKE');
-
-    setComments(prev =>
-      updateCommentTree(prev, commentId, (c) => {
-
-        if (c.dislike.belong) {
-          return {
-            ...c,
-            dislike: { count: c.dislike.count - 1, belong: false }
-          };
-        }
-
-        if (c.like.belong) {
-          return {
-            ...c,
-            like: { count: c.like.count - 1, belong: false },
-            dislike: { count: c.dislike.count + 1, belong: true }
-          };
-        }
-
-        return {
-          ...c,
-          dislike: { count: c.dislike.count + 1, belong: true }
-        };
-      })
-    );
+    setComments(prev => updateTree(prev, commentId, c => {
+      if (c.dislike.belong) return { ...c, dislike: { count: c.dislike.count - 1, belong: false } };
+      if (c.like.belong) return { ...c, like: { count: c.like.count - 1, belong: false }, dislike: { count: c.dislike.count + 1, belong: true } };
+      return { ...c, dislike: { count: c.dislike.count + 1, belong: true } };
+    }));
   };
 
   const handleSaveEdit = async (commentId: number, content: string) => {
-  await editComment(commentId, content);
-
-  setComments(prev =>
-    updateCommentTree(prev, commentId, (c) => ({
-      ...c,
-      content
-    }))
-  );
-};
+    await editComment(commentId, content);
+    setComments(prev => updateTree(prev, commentId, c => ({ ...c, content })));
+  };
 
   const handleDeleteComment = async (id: number) => {
     await deleteComment(id);
-
     setComments(prev => removeFromTree(prev, id));
   };
 
   const handleLoadReplies = async (commentId: number) => {
     const data = await getSubComments(commentId, 0, 10, filename!);
-
-    setComments(prev =>
-      updateCommentTree(prev, commentId, (c) => ({
-        ...c,
-        replies: data
-      }))
-    );
+    setComments(prev => updateTree(prev, commentId, c => ({ ...c, replies: data })));
   };
 
   const handleAddReply = async (parentId: number, text: string) => {
     await addComment(text, filename!, parentId);
-
     const data = await getSubComments(parentId, 0, 10, filename!);
-
-    setComments(prev =>
-      updateCommentTree(prev, parentId, (c) => ({
-        ...c,
-        replies: data
-      }))
-    );
+    setComments(prev => updateTree(prev, parentId, c => ({ ...c, replies: data })));
   };
 
-  const updateCommentTree = (comments: Comment[], commentId: number, updater: (c: Comment) => Comment): Comment[] => {
-    return comments.map(c => {
-      if (c.id === commentId) {
-        return updater(c);
-      }
+  const updateTree = (list: Comment[], id: number, fn: (c: Comment) => Comment): Comment[] =>
+    list.map(c => c.id === id ? fn(c) : { ...c, replies: c.replies ? updateTree(c.replies, id, fn) : undefined });
 
-      if ((c as any).replies) {
-        return {
-          ...c,
-          replies: updateCommentTree((c as any).replies, commentId, updater)
-        };
-      }
+  const removeFromTree = (list: Comment[], id: number): Comment[] =>
+    list.filter(c => c.id !== id).map(c => ({ ...c, replies: c.replies ? removeFromTree(c.replies, id) : undefined }));
 
-      return c;
-    });
-  };
+  return (
+    <>
+      <style>{`
+        .vp-wrap {
+          min-height: 100vh; background: #0d0b14;
+          font-family: 'Nunito', sans-serif;
+          display: flex; gap: 28px; padding: 28px;
+          max-width: 1440px; margin: 0 auto; align-items: flex-start;
+        }
+        .vp-main { flex: 1; min-width: 0; }
 
-  const removeFromTree = (comments: Comment[], id: number): Comment[] => {
-    return comments
-      .filter(c => c.id !== id)
-      .map(c => ({
-        ...c,
-        replies: c.replies ? removeFromTree(c.replies, id) : undefined
-      }));
-  };
+        /* Player */
+        .vp-player-box {
+          border-radius: 18px; overflow: hidden;
+          background: #000;
+          box-shadow: 0 16px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(155,89,245,0.08);
+          position: relative;
+        }
+        .vp-player-box video {
+          width: 100%; display: block;
+          max-height: 70vh; background: #000;
+        }
 
-   return (
+        /* Info strip */
+        .vp-info { margin-top: 20px; }
+        .vp-title {
+          font-family: 'Outfit', sans-serif;
+          font-size: 22px; font-weight: 800;
+          color: #f0ecff; line-height: 1.3;
+          letter-spacing: -0.4px; margin-bottom: 16px;
+        }
 
-    <div className="flex gap-6 p-6 w-full">
+        /* Channel row */
+        .vp-channel-row {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 16px 20px;
+          background: #13111f;
+          border: 1px solid rgba(155,89,245,0.1);
+          border-radius: 14px; margin-bottom: 16px;
+          gap: 16px;
+        }
+        .vp-ch-left { display: flex; align-items: center; gap: 14px; }
+        .vp-ch-avatar {
+          width: 46px; height: 46px; border-radius: 50%;
+          background: linear-gradient(135deg, #9b59f5, #e040fb);
+          display: flex; align-items: center; justify-content: center;
+          font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800;
+          color: white; flex-shrink: 0;
+          box-shadow: 0 4px 16px rgba(155,89,245,0.35);
+          cursor: pointer; transition: transform 0.2s;
+        }
+        .vp-ch-avatar:hover { transform: scale(1.06); }
+        .vp-ch-name {
+          font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700;
+          color: #f0ecff; cursor: pointer; transition: color 0.2s;
+        }
+        .vp-ch-name:hover { color: #b47cff; }
+        .vp-ch-subs { font-size: 13px; color: rgba(240,236,255,0.4); margin-top: 2px; }
 
-      {/* 🎬 ЛЕВАЯ ЧАСТЬ */}
-      <div className="flex-1 min-w-0">
+        .vp-sub-btn {
+          padding: 9px 22px; border-radius: 100px;
+          font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700;
+          border: none; cursor: pointer; transition: all 0.22s ease; flex-shrink: 0;
+        }
+        .vp-sub-btn.subscribed {
+          background: rgba(155,89,245,0.12);
+          color: #b47cff;
+          border: 1.5px solid rgba(155,89,245,0.25);
+        }
+        .vp-sub-btn.subscribed:hover { background: rgba(155,89,245,0.2); }
+        .vp-sub-btn.not-subscribed {
+          background: linear-gradient(135deg, #9b59f5, #e040fb);
+          color: white;
+          box-shadow: 0 4px 16px rgba(155,89,245,0.4);
+        }
+        .vp-sub-btn.not-subscribed:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(155,89,245,0.55); }
 
-        <video poster={video?.video_preview != null ? getPreviewUrl(video?.video_preview.previewId) : ""} controls className="w-full max-w-[900px]" preload='metadata' src={videoUrl} onTimeUpdate={handleTimeUpdate}/>
+        /* Reactions bar */
+        .vp-reactions {
+          display: flex; align-items: center; gap: 10px;
+          margin-bottom: 24px;
+        }
+        .vp-react-btn {
+          display: flex; align-items: center; gap: 8px;
+          padding: 10px 20px; border-radius: 100px;
+          font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700;
+          border: none; cursor: pointer; transition: all 0.22s ease;
+        }
+        .vp-react-btn.like {
+          background: rgba(155,89,245,0.1);
+          color: rgba(240,236,255,0.6);
+          border: 1.5px solid rgba(155,89,245,0.12);
+        }
+        .vp-react-btn.like.active {
+          background: rgba(155,89,245,0.22);
+          color: #b47cff;
+          border-color: rgba(155,89,245,0.4);
+          box-shadow: 0 0 20px rgba(155,89,245,0.2);
+        }
+        .vp-react-btn.like:hover { background: rgba(155,89,245,0.18); color: #b47cff; }
 
-        <div className="mt-4 flex gap-4">
-            <div className="flex items-center justify-between mt-6">
+        .vp-react-btn.dislike {
+          background: rgba(240,50,80,0.08);
+          color: rgba(240,236,255,0.5);
+          border: 1.5px solid rgba(240,50,80,0.1);
+        }
+        .vp-react-btn.dislike.active {
+          background: rgba(240,50,80,0.18);
+          color: #ff6b8a;
+          border-color: rgba(240,50,80,0.35);
+        }
+        .vp-react-btn.dislike:hover { background: rgba(240,50,80,0.15); color: #ff6b8a; }
 
-  {/* 👈 ЛЕВАЯ ЧАСТЬ */}
-  <div className="flex items-center gap-3">
+        .vp-views {
+          margin-left: auto; font-size: 13.5px;
+          color: rgba(240,236,255,0.35);
+          display: flex; align-items: center; gap: 6px;
+        }
 
-    {/* аватар */}
-    <div className="w-12 h-12 rounded-full bg-gray-400 flex items-center justify-center text-white text-lg">
-      {video?.channelName.charAt(0)}
-    </div>
+        /* Comments */
+        .vp-comments { margin-top: 8px; }
+        .vp-comments-title {
+          font-family: 'Outfit', sans-serif;
+          font-size: 18px; font-weight: 700;
+          color: #f0ecff; margin-bottom: 18px;
+          display: flex; align-items: center; gap: 8px;
+        }
+        .vp-comment-input-row {
+          display: flex; gap: 12px; margin-bottom: 24px;
+        }
+        .vp-comment-input {
+          flex: 1;
+          background: rgba(155,89,245,0.05);
+          border: 1.5px solid rgba(155,89,245,0.12);
+          border-radius: 12px; padding: 12px 16px;
+          color: #f0ecff; font-family: 'Nunito', sans-serif;
+          font-size: 14.5px; outline: none;
+          transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+        }
+        .vp-comment-input::placeholder { color: rgba(240,236,255,0.25); }
+        .vp-comment-input:focus {
+          border-color: rgba(155,89,245,0.45);
+          background: rgba(155,89,245,0.08);
+          box-shadow: 0 0 0 3px rgba(155,89,245,0.1);
+        }
+        .vp-comment-send {
+          padding: 12px 22px; border-radius: 12px;
+          background: linear-gradient(135deg, #9b59f5, #e040fb);
+          color: white; font-family: 'Outfit', sans-serif;
+          font-size: 14px; font-weight: 700;
+          border: none; cursor: pointer;
+          box-shadow: 0 4px 16px rgba(155,89,245,0.35);
+          transition: all 0.22s ease; flex-shrink: 0;
+        }
+        .vp-comment-send:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(155,89,245,0.5); }
 
-    {/* инфа */}
-    <div>
-      <div
-        onClick={() => navigate(`/channel/${video?.channelId}`)}
-        className="font-semibold cursor-pointer hover:underline"
-      >
-        {video?.channelName}
-      </div>
+        .vp-comments-list { display: flex; flex-direction: column; gap: 0; }
 
-      <div className="text-sm text-gray-500">
-        {video?.subscribersCount} подписчиков
-      </div>
+        /* Sidebar */
+        .vp-sidebar {
+          width: 360px; flex-shrink: 0;
+          position: sticky; top: 90px;
+          max-height: calc(100vh - 110px); overflow-y: auto;
+        }
+        .vp-sidebar-title {
+          font-family: 'Outfit', sans-serif;
+          font-size: 15px; font-weight: 700;
+          color: rgba(240,236,255,0.5); margin-bottom: 16px;
+          text-transform: uppercase; letter-spacing: 0.8px;
+        }
+      `}</style>
 
-      <div className="mt-2 text-gray-400 text-sm">
-        👁 {formatViews(video?.countViewing)} просмотров
-      </div>
-    </div>
-  </div>
+      <div className="vp-wrap">
+        <div className="vp-main">
 
-    {/* 👉 КНОПКА */}
-    <button
-      onClick={handleSubscribe}
-      className={`px-4 py-2 rounded-full font-semibold ${
-        subscribed
-          ? 'bg-gray-300 text-black'
-          : 'bg-white text-black'
-      }`}
-    >
-      {subscribed ? 'Вы подписаны' : 'Подписаться'}
-    </button>
-
-  </div>
-
-            <button
-              onClick={handleLike}
-              className={`px-4 py-2 rounded ${
-                reaction === 'LIKE' ? 'bg-green-500' : 'bg-gray-500'
-              } text-white`}
-            >
-              👍 {likes}
-            </button>
-
-            <button
-              onClick={handleDislike}
-              className={`px-4 py-2 rounded ${
-                reaction === 'DISLIKE' ? 'bg-red-500' : 'bg-gray-500'
-              } text-white`}
-            >
-              👎 {dislikes}
-            </button>
+          {/* Player */}
+          <div className="vp-player-box">
+            <video
+              poster={video?.video_preview ? getPreviewUrl(video.video_preview.previewId) : ''}
+              controls
+              preload="metadata"
+              src={videoUrl}
+              onTimeUpdate={handleTimeUpdate}
+            />
           </div>
 
-          <div className="mt-6">
-            <h2 className="text-xl font-semibold mb-2">Комментарии</h2>
+          <div className="vp-info">
+            <h1 className="vp-title">{video?.title}</h1>
 
-            {/* input */}
-            <div className="flex gap-2 mb-4">
-              <input
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                className="border p-2 flex-1 rounded"
-                placeholder="Написать комментарий..."
-              />
+            {/* Channel */}
+            <div className="vp-channel-row">
+              <div className="vp-ch-left">
+                <div className="vp-ch-avatar" onClick={() => navigate(`/channel/${video?.channelId}`)}>
+                  {video?.channelName?.charAt(0) ?? 'C'}
+                </div>
+                <div>
+                  <div className="vp-ch-name" onClick={() => navigate(`/channel/${video?.channelId}`)}>
+                    {video?.channelName}
+                  </div>
+                  <div className="vp-ch-subs">{video?.subscribersCount ?? 0} подписчиков</div>
+                </div>
+              </div>
               <button
-                onClick={handleAddComment}
-                className="bg-blue-500 text-white px-4 py-2 rounded"
+                className={`vp-sub-btn ${subscribed ? 'subscribed' : 'not-subscribed'}`}
+                onClick={handleSubscribe}
               >
-                Отправить
+                {subscribed ? '✓ Подписан' : '+ Подписаться'}
               </button>
             </div>
 
-            {/* список */}
-            <div className="flex flex-col gap-3">
-              {comments.map((c) => (
-                <CommentItem
-                  key={c.id}
-                  comment={c}
-                  filename={filename!}
-                  onLike={handleCommentLike}
-                  onDislike={handleCommentDislike}
-                  onDelete={handleDeleteComment}
-                  onEdit={handleSaveEdit}
-                  onReply={handleAddReply}
-                  onLoadReplies={handleLoadReplies}
+            {/* Reactions */}
+            <div className="vp-reactions">
+              <button className={`vp-react-btn like${reaction === 'LIKE' ? ' active' : ''}`} onClick={handleLike}>
+                👍 {likes}
+              </button>
+              <button className={`vp-react-btn dislike${reaction === 'DISLIKE' ? ' active' : ''}`} onClick={handleDislike}>
+                👎 {dislikes}
+              </button>
+              <div className="vp-views">
+                👁 {formatViews(video?.countViewing)} просмотров
+              </div>
+            </div>
+
+            {/* Comments */}
+            <div className="vp-comments">
+              <div className="vp-comments-title">
+                💬 Комментарии
+              </div>
+              <div className="vp-comment-input-row">
+                <input
+                  className="vp-comment-input"
+                  placeholder="Напиши что-нибудь..."
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddComment()}
                 />
-              ))}
+                <button className="vp-comment-send" onClick={handleAddComment}>
+                  Отправить
+                </button>
+              </div>
+              <div className="vp-comments-list">
+                {comments.map(c => (
+                  <CommentItem
+                    key={c.id} comment={c} filename={filename!}
+                    onLike={handleCommentLike} onDislike={handleCommentDislike}
+                    onDelete={handleDeleteComment} onEdit={handleSaveEdit}
+                    onReply={handleAddReply} onLoadReplies={handleLoadReplies}
+                  />
+                ))}
+              </div>
             </div>
           </div>
+        </div>
 
+        {/* Sidebar */}
+        <aside className="vp-sidebar">
+          <div className="vp-sidebar-title">Смотреть далее</div>
+          <Recommendations />
+        </aside>
       </div>
-
-      {/* 👉 ПРАВАЯ ЧАСТЬ */}
-      <div className="w-[350px] flex-shrink-0 sticky top-4 h-fit">
-        <Recommendations />
-      </div>
-
-    </div>
+    </>
   );
 }
