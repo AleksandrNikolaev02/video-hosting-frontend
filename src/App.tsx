@@ -9,6 +9,8 @@ import MyChannel from './pages/MyChannel';
 import ChannelPage from './pages/Channel';
 import Subscriptions from './pages/Subscriptions';
 import EditVideo from './pages/EditVideo';
+import Login from './pages/Login';
+import { PrivateRoute } from './component/PrivateRoute';
 
 function App() {
   return (
@@ -17,13 +19,49 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/video" element={<Video />} />
-        <Route path="/upload" element={<UploadVideo />} />
-        <Route path="/create-channel" element={<CreateChannel />} />
+        <Route
+          path="/upload"
+          element={
+            <PrivateRoute>
+              <UploadVideo />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/create-channel"
+          element={
+            <PrivateRoute>
+              <CreateChannel />
+            </PrivateRoute>
+          }
+        />
         <Route path="/search" element={<SearchPage />} />
-        <Route path="/my-channel" element={<MyChannel />} />
+        <Route
+          path="/my-channel"
+          element={
+            <PrivateRoute>
+              <MyChannel />
+            </PrivateRoute>
+          }
+        />
         <Route path="/channel/:id" element={<ChannelPage />} />
-        <Route path="/subscriptions" element={<Subscriptions />} />
-        <Route path="/edit-video" element={<EditVideo />} />
+        <Route
+          path="/subscriptions"
+          element={
+            <PrivateRoute>
+              <Subscriptions />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/edit-video"
+          element={
+            <PrivateRoute>
+              <EditVideo />
+            </PrivateRoute>
+          }
+        />
+        <Route path="/login" element={<Login />} />
       </Routes>
     </BrowserRouter>
   )

@@ -1,16 +1,33 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { hasChannel } from '../api/api';
+import { getAccessToken } from '../util/auth';
 
 export default function Header() {
   const [hasChannelState, setHasChannelState] = useState<boolean | null>(null);
   const [query, setQuery] = useState('');
+  const [isAuth, setIsAuth] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    const token = getAccessToken();
+    setIsAuth(!!token);
+  }, []);
+
+  useEffect(() => {
+    const token = getAccessToken();
+
+    if (!token) {
+      setHasChannelState(false);
+      return;
+    }
+
     hasChannel()
       .then(setHasChannelState)
       .catch(() => setHasChannelState(false));
+
+    setIsAuth(!!token);
+
   }, []);
 
   const handleSearch = () => {
@@ -46,24 +63,47 @@ export default function Header() {
       </div>
 
       <div className="flex gap-4">
-
-        <button onClick={() => navigate('/subscriptions')}>
-          Подписки
+      {!isAuth && (
+        <button
+          onClick={() => navigate('/login')}
+          className="bg-green-500 px-3 py-1 rounded"
+        >
+          Войти
         </button>
+      )}
 
-        {hasChannelState && (
+      {isAuth && (
+        <button
+          onClick={() => {
+            localStorage.clear();
+            navigate('/login');
+            window.location.reload();
+          }}
+          className="bg-red-500 px-3 py-1 rounded"
+        >
+          Выйти
+        </button>
+      )}
+
+        {isAuth && (
+          <button onClick={() => navigate('/subscriptions')}>
+            Подписки
+          </button>
+        )}
+
+        {isAuth && hasChannelState && (
             <Link to="/my-channel" className="bg-gray-600 px-3 py-1 rounded">
             My channel
           </Link>
         )}
 
-        {hasChannelState && (
+        {isAuth && hasChannelState && (
           <Link to="/upload" className="bg-blue-500 px-3 py-1 rounded">
             Upload
           </Link>
         )}
 
-        {!hasChannelState && hasChannelState !== null && (
+        {isAuth && !hasChannelState && hasChannelState !== null && (
           <Link to="/create-channel" className="bg-gray-600 px-3 py-1 rounded">
             Create Channel
           </Link>

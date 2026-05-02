@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '../util/auth';
 
 const url = 'http://localhost:8084'
 
@@ -11,12 +12,7 @@ export const getBaseUrl = () => {
 }
 
 api.interceptors.request.use(config => {
-  localStorage.setItem('token', 'eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJQcm9qZWN0Iiwic3ViIjoiYWRtaW5AbWFpbC5ydSIsInJvbGUiOiJBRE1JTiIsImlkIjoxLCJleHAiOjE3NzA2Mzc0MDQsImlhdCI6MTczOTEwMTQwNH0.bR-N-fUFKUb-FyHRc76gjKM-Lot6bCqXU0ZcHEG2wTI');
-  // убрать потом
-
-  config.headers['X-user-id'] = '1'; // для теста, потом убрать
-
-  const token = localStorage.getItem('token');
+  const token = getAccessToken();
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -25,15 +21,51 @@ api.interceptors.request.use(config => {
   return config;
 });
 
+api.interceptors.response.use(
+  res => res,
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const res = await axios.post('noauth/auth-service/token/refresh', {
+          token: getRefreshToken()
+        });
+
+        const { accessToken, refreshToken } = res.data;
+
+        setTokens(accessToken, refreshToken);
+
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+
+        return api(originalRequest);
+
+      } catch (e) {
+        clearTokens();
+        window.location.href = '/login';
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 // если передан X-user-id, то рекомендации, если нет - самые популярные видео
 export const getRecommendations = async () => {
-  const res = await api.get('business-service/video/get_popular');
+  let res = null;
+  if (getAccessToken() != null) {
+    res = await api.get('auth/business-service/video/get_popular');
+  } else {
+    res = await api.get('noauth/business-service/video/get_popular');
+  }
   return res.data;
 };
 
 // потоковый стриминг видео
 export const getVideo = async (filename: string, user_id: number) => {
-  const res = await api.get(`/file-service/file_chunk?filename=${filename}&user_id=${user_id}`);
+  const res = await api.get(`noauth/file-service/file_chunk?filename=${filename}&user_id=${user_id}`);
   return res.data;
 };
 
@@ -43,7 +75,7 @@ export const reactVideo = async (
   filename: string,
   evaluateType: 'LIKE' | 'DISLIKE'
 ) => {
-  return api.post('/business-service/video/react', {
+  return api.post('auth/business-service/video/react', {
     filename,
     evaluateType,
   });
@@ -51,25 +83,25 @@ export const reactVideo = async (
 
 // получить лайки и дизлайки видео
 export const getReactions = async (filename: string) => {
-  const res = await api.get(`business-service/video/get_evaluates/${filename}`);
+  const res = await api.get(`noauth/business-service/video/get_evaluates/${filename}`);
   return res.data;
 };
 
 // Проверить принадлежность лайка и дизлайка видео
 export const checkEvaluate = async (filename: string) => {
-  const res = await api.post('business-service/video/check_evaluate', { filename });
+  const res = await api.post('auth/business-service/video/check_evaluate', { filename });
   return res.data;
 };
 
 // получить комментарии к видео
 export const getComments = async (filename: string, page: number, size: number) => {
-  const res = await api.get(`business-service/comment/get-comments-video/${filename}?page=${page}&size=${size}`)
+  const res = await api.get(`noauth/business-service/comment/get-comments-video/${filename}?page=${page}&size=${size}`)
   return res.data;
 };
 
 // добавить комментарий к видео
 export const addComment = async (content: string, videoId: string, commentId?: number) => {
-  const res = await api.post('business-service/comment/add', 
+  const res = await api.post('auth/business-service/comment/add', 
     {
       content,
       videoId,
@@ -81,7 +113,7 @@ export const addComment = async (content: string, videoId: string, commentId?: n
 
 // поставить лайк или дизлайк комментарию
 export const reactComment = async (commentId: number, evaluateType: 'LIKE' | 'DISLIKE') => {
-  const res = await api.post('business-service/comment/react', {
+  const res = await api.post('auth/business-service/comment/react', {
     commentId,
     evaluateType
   });
@@ -90,7 +122,7 @@ export const reactComment = async (commentId: number, evaluateType: 'LIKE' | 'DI
 
 // редактировать комментарий
 export const editComment = async (commentId: number, content: string) => {
-  const res = await api.put('business-service/comment/edit', {
+  const res = await api.put('auth/business-service/comment/edit', {
     content,
     commentId
   });
@@ -99,14 +131,14 @@ export const editComment = async (commentId: number, content: string) => {
 
 // удалить комментарий
 export const deleteComment = async (commentId: number) => {
-  const res = await api.delete(`business-service/comment/delete/${commentId}`);
+  const res = await api.delete(`auth/business-service/comment/delete/${commentId}`);
   return res.data;
 };
 
 // получить подкомментарии к комментарию
 export const getSubComments = async (parentId: number, page: number,
                                      size: number, filename: string) => {
-  const res = await api.post(`business-service/comment/get-sub-comments-video?page=${page}&size=${size}`,
+  const res = await api.post(`noauth/business-service/comment/get-sub-comments-video?page=${page}&size=${size}`,
     {
       filename,
       parentId
@@ -117,18 +149,18 @@ export const getSubComments = async (parentId: number, page: number,
 
 // проверить наличие канала пользователя
 export const getMyChannel = async () => {
-  const res = await api.get('business-service/channel/my');
+  const res = await api.get('auth/business-service/channel/my');
   return res.data;
 };
 
 export const hasChannel = async (): Promise<boolean> => {
-  const res = await api.get('business-service/channel/my');
+  const res = await api.get('auth/business-service/channel/my');
   return !!res.data;
 };
 
 // создать канал пользователя
 export const createChannel = async (name: string) => {
-  await api.post('business-service/channel/create', {
+  await api.post('auth/business-service/channel/create', {
     name
   });
 };
@@ -138,40 +170,40 @@ export const createVideo = async (dto: {
   title: string;
   description: string;
 }) => {
-  const res = await api.post('business-service/video/create', dto);
+  const res = await api.post('auth/business-service/video/create', dto);
   return res.data;
 };
 
 // загрузить видео по частям
 export const uploadChunk = async (formData: FormData) => {
-  return api.post('file-service/save_chunk', formData);
+  return api.post('auth/file-service/save_chunk', formData);
 };
 
 // сохранить видео после загрузки всех частей
 export const saveAllChunks = async (key: string, filename: string, userId: number) => {
-  return api.post('file-service/save_all', { userId, key, filename });
+  return api.post('auth/file-service/save_all', { userId, key, filename });
 };
 
 // опубликовать видео
 export const postVideo = async (filename: string) => {
-  return api.post(`business-service/video/post?filename=${filename}`);
+  return api.post(`auth/business-service/video/post?filename=${filename}`);
 };
 
 // релевантный поиск видео по запросу
 export const searchVideos = async (query: string) => {
-  const res = await api.get(`business-service/video/search?query=${query}`);
+  const res = await api.get(`noauth/business-service/video/search?query=${query}`);
   return res.data;
 };
 
 // получить список своих видео
 export const getMyVideos = async () => {
-  const res = await api.get('business-service/video/get_videos');
+  const res = await api.get('auth/business-service/video/get_videos');
   return res.data;
 };
 
 // удалить свое видео
 export const deleteVideo = async (filename: string) => {
-  await api.delete('business-service/video/delete', {
+  await api.delete('auth/business-service/video/delete', {
     data: {
       filename: filename
     }
@@ -180,50 +212,58 @@ export const deleteVideo = async (filename: string) => {
 
 // получить информацию о канале
 export const getChannel = async (id: number) => {
-  const res = await api.get(`business-service/channel/channel/${id}`);
+  const res = await api.get(`noauth/business-service/channel/channel/${id}`);
   return res.data;
 };
 
 // получить видео с канала пользователя
 export const getChannelVideos = async (id: number) => {
-  const res = await api.get(`business-service/video/get_videos_by_channel/${id}`);
+  const res = await api.get(`noauth/business-service/video/get_videos_by_channel/${id}`);
   return res.data;
 };
 
 // получить информацию о видео
 export const getVideoInfo = async (filename: string) => {
-  const res = await api.get(`business-service/video/get_video/${filename}`);
+  const res = await api.get(`noauth/business-service/video/get_video/${filename}`);
   return res.data;
 };
 
 // подписаться на канал
 export const subscribe = async (channelId: number) => {
-  await api.post('business-service/subscription/subscribe', {
+  await api.post('auth/business-service/subscription/subscribe', {
     channelId
   });
 };
 
 // отписаться от канала
 export const unsubscribe = async (channelId: number) => {
-  await api.post('business-service/subscription/unsubscribe', {
+  await api.post('auth/business-service/subscription/unsubscribe', {
     channelId
   });
 };
 
 // получить список каналов, на которые подписан пользователь
 export const getMySubscriptions = async () => {
-  const res = await api.get('business-service/subscription/list-channels');
+  const res = await api.get('auth/business-service/subscription/list-channels');
   return res.data;
 };
 
 // добавить просмотр к видео
 export const addViewing = async (filename: string) => {
-  await api.post(`business-service/viewing/add/${filename}`);
+  let res = null;
+  
+  if (getAccessToken() != null) {
+    res = await api.post(`auth/business-service/viewing/add/${filename}`);
+  } else {
+    res = await api.post(`noauth/business-service/viewing/add/${filename}`);
+  }
+  
+  return res;
 };
 
 // создать бизнес сущность превью
 export const createPreview = async (videoId: string) => {
-  const res = await api.post('business-service/preview/create', {
+  const res = await api.post('auth/business-service/preview/create', {
     videoId
   });
   return res.data;
@@ -244,7 +284,7 @@ export const uploadPreview = async (file: File, filename: string, originalFilena
   );
 
   const res = await api.post(
-    'file-service/save_preview',
+    'auth/file-service/save_preview',
     formData,
     {
       headers: {
@@ -258,7 +298,7 @@ export const uploadPreview = async (file: File, filename: string, originalFilena
 
 // получить url превью
 export const getPreviewUrl = (filename: string | undefined) => {
-  return `${url}/file-service/get_preview/${filename}`;
+  return `${url}/noauth/file-service/get_preview/${filename}`;
 };
 
 // редактировать видео
@@ -266,7 +306,7 @@ export const updateVideo = async (filename: string, data: {
   title: string;
   description: string;
 }) => {
-  await api.put(`business-service/video/update/${filename}`, data);
+  await api.put(`auth/business-service/video/update/${filename}`, data);
 };
 
 // обновить превью видео
@@ -282,12 +322,12 @@ export const updatePreview = async (file: File, filename: string, originalFilena
 
   formData.append('file', file);
 
-  await api.put('file-service/update_preview', formData);
+  await api.put('auth/file-service/update_preview', formData);
 };
 
 // добавить коллекцию тегов
 export const addTags = async (filename: string, names: string[]) => {
-  await api.post('business-service/tag/add', {
+  await api.post('auth/business-service/tag/add', {
     filename,
     names
   });
@@ -295,10 +335,27 @@ export const addTags = async (filename: string, names: string[]) => {
 
 // удалить коллекцию тегов
 export const deleteTags = async (filename: string, names: string[]) => {
-  await api.delete('business-service/tag/delete', {
+  await api.delete('auth/business-service/tag/delete', {
     data: { 
       filename: filename,
       names: names
     }
   });
 };
+
+// аутентификация пользователя
+export const login = async (data: { email: string; password: string }) => {
+  const res = await api.post('noauth/auth-service/login', data);
+  return res.data;
+}
+
+// двухфакторная аутентификация
+export const twoFactor = async (data: { email: string; code: string }) => {
+  const dto = {
+    code: data.code,
+    login: data.email
+  }
+  
+  const res = await api.post('noauth/auth-service/twoFactor', dto);
+  return res.data;
+}

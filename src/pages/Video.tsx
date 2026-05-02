@@ -80,7 +80,7 @@ export default function Video() {
     });
   }, [filename]);
 
-  const videoUrl = `${getBaseUrl()}/file-service/file_chunk?filename=${filename}&user_id=${video?.userId}`;
+  const videoUrl = `${getBaseUrl()}/noauth/file-service/file_chunk?filename=${filename}&user_id=${video?.userId}`;
 
   const handleSubscribe = async () => {
     if (!video?.channelId) return;
