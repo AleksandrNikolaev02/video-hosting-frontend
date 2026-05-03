@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getMyChannelInfo, getChannelVideos, getPreviewUrl } from '../api/api';
+import { getMyChannelInfo, getMyVideos, postVideo, getPreviewUrl } from '../api/api';
 import type { Video } from '../model/Video';
 
 export default function MyChannel() {
@@ -12,12 +12,27 @@ export default function MyChannel() {
   useEffect(() => {
     getMyChannelInfo().then(ch => {
       setChannel(ch);
-      return getChannelVideos(ch.id);
+      return getMyVideos();
     }).then(vids => {
       setVideos(vids);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  const [publishing, setPublishing] = useState<string | null>(null);
+
+  const handlePublish = async (filename: string) => {
+    try {
+      setPublishing(filename);
+      await postVideo(filename);
+      const vids = await getMyVideos();
+      setVideos(vids);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPublishing(null);
+    }
+  };
 
   const formatViews = (n?: number) => {
     if (!n) return '0';
@@ -161,11 +176,35 @@ export default function MyChannel() {
         }
         .mc-edit-btn:hover { background: rgba(155,89,245,0.2); border-color: rgba(155,89,245,0.4); }
 
+        .mc-publish-btn {
+          padding: 8px 16px; border-radius: 100px;
+          background: linear-gradient(135deg, rgba(52,211,153,0.15), rgba(16,185,129,0.1));
+          color: #34d399;
+          border: 1.5px solid rgba(52,211,153,0.3);
+          font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700;
+          cursor: pointer; transition: all 0.2s;
+          display: inline-flex; align-items: center; gap: 5px;
+        }
+        .mc-publish-btn:hover { background: rgba(52,211,153,0.25); border-color: rgba(52,211,153,0.5); }
+        .mc-publish-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .mc-draft-badge {
+          display: inline-flex; align-items: center; gap: 4px;
+          background: rgba(245,158,11,0.1);
+          border: 1px solid rgba(245,158,11,0.2);
+          color: #fbbf24; border-radius: 100px;
+          padding: 2px 10px; font-size: 11.5px; font-weight: 700;
+          font-family: 'Outfit', sans-serif;
+        }
+
         .mc-empty {
           text-align: center; padding: 80px 20px;
           color: rgba(240,236,255,0.25); font-size: 15px;
         }
         .mc-empty-icon { font-size: 50px; display: block; margin-bottom: 14px; }
+
+        .spin { display: inline-block; animation: spin2 0.8s linear infinite; }
+        @keyframes spin2 { to { transform: rotate(360deg); } }
       `}</style>
 
       <div className="mc-wrap">
@@ -211,7 +250,7 @@ export default function MyChannel() {
                     onClick={() => navigate(`/video?filename=${v.filename}`)}
                   >
                     {v.video_preview
-                      ? <img src={getPreviewUrl(v?.video_preview.previewId) as unknown as string} alt={v.title} />
+                      ? <img src={getPreviewUrl(v.video_preview.previewId) as unknown as string} alt={v.title} />
                       : '▶'
                     }
                   </div>
@@ -219,11 +258,31 @@ export default function MyChannel() {
                     <div className="mc-vid-title" onClick={() => navigate(`/video?filename=${v.filename}`)}>
                       {v.title}
                     </div>
-                    <div className="mc-vid-meta">
-                      👁 {formatViews(v.countViewing)} просмотров
+                    <div className="mc-vid-meta" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {/* Бейдж "Черновик" — показывается если видео не опубликовано */}
+                      {v.videoStatus === 'DRAFT' && (
+                        <span className="mc-draft-badge">⏸ Черновик</span>
+                      )}
+                      {v.videoStatus === 'UPLOADED' && (
+                        <span style={{ fontSize: 13, color: 'rgba(240,236,255,0.35)' }}>
+                          👁 {formatViews(v.countViewing)} просмотров
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="mc-vid-actions">
+                    {v.videoStatus === 'DRAFT' && (
+                      <button
+                        className="mc-publish-btn"
+                        onClick={() => handlePublish(v.filename)}
+                        disabled={publishing === v.filename}
+                      >
+                        {publishing === v.filename
+                          ? <><span className="spin">◌</span> Публикуем...</>
+                          : '🚀 Опубликовать'
+                        }
+                      </button>
+                    )}
                     <Link to={`/edit-video?filename=${v.filename}`} className="mc-edit-btn">
                       ✏️ Редактировать
                     </Link>
