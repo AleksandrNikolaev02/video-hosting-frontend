@@ -11,6 +11,7 @@ import Subscriptions from './pages/Subscriptions';
 import EditVideo from './pages/EditVideo';
 import Login from './pages/Login';
 import { PrivateRoute } from './component/PrivateRoute';
+import Register from './pages/Register';
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
           }
         />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
       </Routes>
     </BrowserRouter>
   )

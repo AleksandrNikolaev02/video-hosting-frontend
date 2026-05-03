@@ -356,12 +356,17 @@ export const login = async (data: { email: string; password: string }) => {
 }
 
 // двухфакторная аутентификация
-export const twoFactor = async (data: { email: string; code: string }) => {
+export const twoFactor = async (data: { email: string; code: string }, type?: string) => {
   const dto = {
     code: data.code,
-    login: data.email
+    login: data.email,
+    kind: type != null ? type : 'LOGIN'
   }
   
   const res = await api.post('noauth/auth-service/twoFactor', dto);
   return res.data;
 }
+
+export const register = async (data: { firstName: string, secondName: string, email: string, password: string}) => {
+  await api.post('noauth/auth-service/register', data);
+};

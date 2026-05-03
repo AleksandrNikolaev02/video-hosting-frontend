@@ -13,7 +13,7 @@ export default function Header() {
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const refreshAuth = () => {
     const token = getAccessToken();
     setIsAuth(!!token);
     if (token) {
@@ -21,6 +21,12 @@ export default function Header() {
     } else {
       setHasChannelState(false);
     }
+  };
+
+  useEffect(() => {
+    refreshAuth();
+    window.addEventListener('auth:change', refreshAuth);
+    return () => window.removeEventListener('auth:change', refreshAuth);
   }, []);
 
   useEffect(() => {

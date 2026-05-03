@@ -18,7 +18,11 @@ export default function Login() {
       setLoading(true); setError('');
       const res = await login({ email, password });
       if (res.requires2FA) setStep('2fa');
-      else { setTokens(res.payload.accessToken, res.payload.refreshToken); navigate('/'); }
+      else {
+        setTokens(res.payload.accessToken, res.payload.refreshToken);
+        window.dispatchEvent(new Event('auth:change'));
+        navigate('/');
+      }
     } catch { setError('Неверный email или пароль'); }
     finally { setLoading(false); }
   };
@@ -29,6 +33,7 @@ export default function Login() {
       setLoading(true); setError('');
       const res = await twoFactor({ email, code });
       setTokens(res.accessToken, res.refreshToken);
+      window.dispatchEvent(new Event('auth:change'));
       navigate('/');
     } catch { setError('Неверный или устаревший код'); }
     finally { setLoading(false); }
@@ -242,6 +247,16 @@ export default function Login() {
               <button className="login-btn" onClick={handleLogin} disabled={loading}>
                 {loading ? <span className="spin">◌</span> : 'Войти →'}
               </button>
+
+              <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13.5, color: 'rgba(240,236,255,0.35)', fontFamily: 'Nunito, sans-serif' }}>
+                Нет аккаунта?{' '}
+                <a href="/register" style={{ color: '#b47cff', textDecoration: 'none', fontWeight: 700 }}
+                  onMouseOver={e => (e.currentTarget.style.color = '#cba3ff')}
+                  onMouseOut={e => (e.currentTarget.style.color = '#b47cff')}
+                >
+                  Зарегистрироваться
+                </a>
+              </div>
             </>
           ) : (
             <>
